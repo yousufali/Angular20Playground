@@ -7,10 +7,21 @@
     "body-parser": "^1.8.2",
     "express": "^4.9.3",
     "morgan": "^1.1.1",
-    "serve-favicon": "^2.0.1"
+    "serve-favicon": "^2.0.1",
+     "angular2": "2.0.0-beta.6",
+    "systemjs": "0.19.20",
+    "es6-promise": "^3.0.2",
+    "es6-shim": "^0.33.3",
+    "reflect-metadata": "0.1.2",
+    "rxjs": "5.0.0-beta.0",
+    "zone.js": "0.5.14"
   },
   "devDependencies": {
-    "gulp": "^3.9.1"
+    "gulp": "^3.9.1",
+    "concurrently": "^1.0.0",
+    "lite-server": "^2.0.1",
+    "typescript": "^1.7.5",
+    "typings":"^0.6.8"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
