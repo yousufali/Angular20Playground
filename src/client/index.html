@@ -12,6 +12,7 @@
     <script src="node_modules/systemjs/dist/system.src.js"></script>
     <script src="node_modules/rxjs/bundles/Rx.js"></script>
     <script src="node_modules/angular2/bundles/angular2.dev.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
 
     <!-- 2. Configure SystemJS -->
     <script>
@@ -26,12 +27,59 @@
       System.import('js/main')
             .then(null, console.error.bind(console));
     </script>
+    <script src="js/voice.js"></script>
 
   </head>
 
   <!-- 3. Display the application -->
   <body>
     <my-app>Loading...</my-app>
+    <div style="margin-top:20px; font-family: Arial, sans-serif; max-width: 720px;">
+      <h2>Calling System</h2>
+
+      <section id="registerForm" style="margin: 12px 0;">
+        <label>Username:</label>
+        <input id="username" placeholder="e.g. alice" style="padding:4px"/>
+        <button id="registerBtn" style="padding:6px 10px">Register</button>
+      </section>
+
+      <section id="appArea">
+        <div style="display:flex; gap: 24px;">
+          <div style="flex:1;">
+            <h3>Online Users</h3>
+            <ul id="users" style="list-style: none; padding-left: 0;"></ul>
+          </div>
+          <div style="flex:2;">
+            <div style="margin-bottom:8px;">
+              <strong>Me:</strong> <span id="meName">-</span>
+            </div>
+
+            <div id="incomingPanel" style="display:none; background:#fffae6; border: 1px solid #f5e4a7; padding: 10px; border-radius: 4px; margin-bottom: 8px;">
+              <span id="incomingText">Incoming call...</span>
+              <div style="margin-top:8px;">
+                <button id="acceptBtn" style="padding:6px 10px">Accept</button>
+                <button id="declineBtn" style="padding:6px 10px">Decline</button>
+              </div>
+            </div>
+
+            <div style="margin: 8px 0;">
+              <span id="status">Idle</span>
+            </div>
+
+            <div style="margin-top:10px;">
+              <audio id="localAudio" autoplay muted></audio>
+              <audio id="remoteAudio" autoplay></audio>
+            </div>
+            <div style="margin-top:8px;">
+              <button id="muteBtn" style="padding:6px 10px">Mute</button>
+              <button id="hangBtn" style="padding:6px 10px; display:none;">Hang up</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <p style="color:#666; font-size: 12px;">Open in two browsers, register different usernames, then call.</p>
+    </div>
   </body>
 
 </html>
