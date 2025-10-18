@@ -2,7 +2,15 @@
 'use strict';
 
 var express = require('express');
+var http = require('http');
 var app = express();
+var server = http.createServer(app);
+var { Server } = require('socket.io');
+var io = new Server(server, {
+    cors: {
+        origin: '*',
+    }
+});
 var bodyParser = require('body-parser');
 var favicon = require('serve-favicon');
 var morganLogger = require('morgan');
@@ -44,7 +52,39 @@ switch (environment){
         break;
 }
 
-app.listen(port, function() {
+// --- Simple Socket.IO signaling ---
+// Rooms are identified by a string (e.g., "public" or user-selected code)
+// We forward SDP offers/answers and ICE candidates between peers in the same room
+io.on('connection', function(socket) {
+    socket.on('join', function(roomId) {
+        socket.join(roomId);
+        var numClients = io.sockets.adapter.rooms.get(roomId)?.size || 0;
+        socket.emit('joined', { roomId: roomId, numClients: numClients });
+        socket.to(roomId).emit('peer-joined', { socketId: socket.id, numClients: numClients });
+    });
+
+    socket.on('signal', function(payload) {
+        var roomId = payload && payload.roomId;
+        if (!roomId) return;
+        // broadcast to everyone else in the room
+        socket.to(roomId).emit('signal', {
+            from: socket.id,
+            data: payload.data
+        });
+    });
+
+    socket.on('leave', function(roomId) {
+        socket.leave(roomId);
+        socket.to(roomId).emit('peer-left', { socketId: socket.id });
+    });
+
+    socket.on('disconnect', function() {
+        // Room-specific notifications aren't trivial without tracking per-socket rooms
+        // Clients can handle reconnection as needed
+    });
+});
+
+server.listen(port, function() {
     console.log('Express server listening on port ' + port);
     console.log('env = ' + app.get('env') +
         '\n__dirname = ' + __dirname  +

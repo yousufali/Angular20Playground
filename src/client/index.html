@@ -12,6 +12,7 @@
     <script src="node_modules/systemjs/dist/system.src.js"></script>
     <script src="node_modules/rxjs/bundles/Rx.js"></script>
     <script src="node_modules/angular2/bundles/angular2.dev.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
 
     <!-- 2. Configure SystemJS -->
     <script>
@@ -26,12 +27,28 @@
       System.import('js/main')
             .then(null, console.error.bind(console));
     </script>
+    <script src="js/voice.js"></script>
 
   </head>
 
   <!-- 3. Display the application -->
   <body>
     <my-app>Loading...</my-app>
+    <div style="margin-top:20px; font-family: Arial, sans-serif;">
+      <h2>Simple Voice Chat</h2>
+      <div>
+        <label>Room:</label>
+        <input id="roomId" placeholder="public" value="public" style="padding:4px"/>
+        <button id="joinBtn" style="padding:6px 10px">Join & Start</button>
+        <button id="leaveBtn" style="padding:6px 10px">Leave</button>
+        <button id="muteBtn" style="padding:6px 10px">Mute</button>
+      </div>
+      <div style="margin-top:10px;">
+        <audio id="localAudio" autoplay muted></audio>
+        <audio id="remoteAudio" autoplay></audio>
+      </div>
+      <p style="color:#666; font-size: 12px;">Open this page in two tabs with the same room to test.</p>
+    </div>
   </body>
 
 </html>

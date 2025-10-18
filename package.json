@@ -8,6 +8,7 @@
     "express": "^4.9.3",
     "morgan": "^1.1.1",
     "serve-favicon": "^2.0.1",
+    "socket.io": "^4.7.5",
      "angular2": "2.0.0-beta.6",
     "systemjs": "0.19.20",
     "es6-promise": "^3.0.2",
@@ -24,6 +25,8 @@
     "typings":"^0.6.8"
   },
   "scripts": {
+    "start": "node src/server/app.js",
+    "dev": "NODE_ENV=development node src/server/app.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "yousuf",
