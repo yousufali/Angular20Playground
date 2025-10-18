@@ -1,37 +1,164 @@
+<!doctype html>
 <html>
   <head>
-    <title>Angular 2 Playground</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">    
+    <meta charset="utf-8" />
+    <title>Call & Contact Manager</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      :root {
+        --blue: #2563eb;
+        --green: #16a34a;
+        --red: #dc2626;
+        --bg: #0b1220;
+        --card: #111827;
+        --muted: #94a3b8;
+        --text: #e5e7eb;
+        --border: #1f2937;
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+        background: linear-gradient(180deg, #0b1220 0%, #0b1220 60%, #0a0f1a 100%);
+        color: var(--text);
+      }
+      .container { max-width: 920px; margin: 0 auto; padding: 16px; }
+      .app-title { font-size: 20px; font-weight: 600; letter-spacing: 0.2px; opacity: 0.95; }
+      .tabs {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 8px;
+        margin-top: 16px;
+        background: rgba(255,255,255,0.03);
+        padding: 8px;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+      }
+      .tab-btn {
+        appearance: none;
+        border: 1px solid var(--border);
+        background: #0e1626;
+        color: var(--text);
+        padding: 10px 12px;
+        border-radius: 10px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
+      }
+      .tab-btn:hover { transform: translateY(-1px); border-color: #334155; }
+      .tab-btn.active { background: #111a2b; border-color: #3b82f6; }
 
-    <!-- 1. Load libraries -->
-    <!-- IE required polyfills, in this exact order -->
-    <script src="node_modules/es6-shim/es6-shim.min.js"></script>
-    <!--<script src="node_modules/systemjs/dist/system-polyfills.js"></script>
+      .card {
+        margin-top: 16px;
+        background: #0e1626;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 16px;
+      }
+      .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+      .stack { display: grid; gap: 12px; }
+      .stack-lg { display: grid; gap: 16px; }
+      .label { font-size: 12px; color: var(--muted); }
+      input[type="text"], input[type="tel"], select {
+        width: 100%;
+        padding: 10px 12px;
+        border-radius: 10px;
+        background: #0a1322;
+        border: 1px solid var(--border);
+        color: var(--text);
+        outline: none;
+      }
+      .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+      .btn { border: 0; color: white; padding: 10px 12px; border-radius: 10px; cursor: pointer; font-weight: 700; }
+      .btn-blue { background: var(--blue); }
+      .btn-green { background: var(--green); }
+      .btn-red { background: var(--red); }
+      .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
 
-    <script src="node_modules/angular2/bundles/angular2-polyfills.js"></script>-->
-    <script src="node_modules/systemjs/dist/system.src.js"></script>
-    <script src="node_modules/rxjs/bundles/Rx.js"></script>
-    <script src="node_modules/angular2/bundles/angular2.dev.js"></script>
+      .list { display: grid; gap: 10px; }
+      .list-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border: 1px solid var(--border); border-radius: 10px; background: #0b1424; }
+      .pill { display: inline-flex; align-items: center; gap: 6px; background: #0a1322; border: 1px solid var(--border); padding: 6px 10px; border-radius: 999px; font-size: 12px; color: var(--muted); }
+      .empty { color: var(--muted); font-style: italic; }
+      .muted { color: var(--muted); }
 
-    <!-- 2. Configure SystemJS -->
-    <script>
-      System.config({
-        packages: {        
-          app: {
-            format: 'register',
-            defaultExtension: 'js'
-          }
-        }
-      });
-      System.import('js/main')
-            .then(null, console.error.bind(console));
-    </script>
-
+      @media (min-width: 720px) {
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+      }
+    </style>
   </head>
-
-  <!-- 3. Display the application -->
   <body>
-    <my-app>Loading...</my-app>
-  </body>
+    <div class="container">
+      <div class="app-title">Call & Contact Manager</div>
 
+      <div class="tabs" role="tablist">
+        <button class="tab-btn active" data-tab="phone" aria-selected="true">Phone Number</button>
+        <button class="tab-btn" data-tab="friends" aria-selected="false">Friends</button>
+        <button class="tab-btn" data-tab="messages" aria-selected="false">Messages</button>
+        <button class="tab-btn" data-tab="groups" aria-selected="false">Groups</button>
+      </div>
+
+      <section id="tab-phone" class="card stack-lg" role="tabpanel" aria-labelledby="tab-phone-label">
+        <div class="stack">
+          <label class="label" for="phone-input">Enter phone number</label>
+          <input id="phone-input" type="tel" placeholder="e.g. +1 555 123 4567" />
+          <div class="actions">
+            <button id="call-btn" class="btn btn-blue">Call</button>
+            <button id="clear-input-btn" class="btn btn-ghost">Clear</button>
+          </div>
+        </div>
+        <div id="call-panel" class="stack" style="display:none">
+          <div>
+            <span class="label">Call status</span>
+            <div id="call-status" class="pill">Idle</div>
+          </div>
+          <div class="actions">
+            <button id="answer-btn" class="btn btn-green">Answered</button>
+            <button id="noanswer-btn" class="btn btn-red">Did Not Answer</button>
+            <button id="friend-btn" class="btn btn-blue" style="display:none">Add to Friends</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="tab-friends" class="card stack-lg" role="tabpanel" hidden>
+        <div class="stack">
+          <div class="label">Friends</div>
+          <div id="friends-list" class="list"></div>
+        </div>
+      </section>
+
+      <section id="tab-messages" class="card stack-lg" role="tabpanel" hidden>
+        <div class="stack">
+          <div class="label">Messages (Call Log)</div>
+          <div id="log-list" class="list"></div>
+        </div>
+      </section>
+
+      <section id="tab-groups" class="card stack-lg" role="tabpanel" hidden>
+        <div class="grid-2">
+          <div class="stack">
+            <div class="label">Create group</div>
+            <input id="group-name-input" type="text" placeholder="Group name" />
+            <div class="actions">
+              <button id="create-group-btn" class="btn btn-blue">Create Group</button>
+            </div>
+          </div>
+          <div class="stack">
+            <div class="label">Assign friend to group</div>
+            <select id="group-friend-select"></select>
+            <select id="group-select"></select>
+            <div class="actions">
+              <button id="assign-group-btn" class="btn btn-blue">Assign</button>
+            </div>
+          </div>
+        </div>
+        <div class="stack">
+          <div class="label">Groups</div>
+          <div id="groups-list" class="list"></div>
+        </div>
+      </section>
+    </div>
+
+    <script src="js/main.js"></script>
+  </body>
 </html>

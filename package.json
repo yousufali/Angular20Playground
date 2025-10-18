@@ -24,6 +24,9 @@
     "typings":"^0.6.8"
   },
   "scripts": {
+    "start": "node src/server/app.js",
+    "dev": "NODE_ENV=development node src/server/app.js",
+    "build": "echo \"No build step required for vanilla client\"",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "yousuf",
