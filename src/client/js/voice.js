@@ -1,23 +1,167 @@
 "use strict";
 
-// Minimal WebRTC voice client with Socket.IO signaling
+// Voice calling client with presence + invites over Socket.IO and WebRTC audio
 (function () {
+  // --- State ---
   var socket = null;
+  var username = null;
+  var users = [];
+
+  var call = {
+    id: null,
+    roomId: null,
+    role: null, // 'caller' | 'callee'
+  };
+
   var peerConnection = null;
   var localStream = null;
-  var roomId = null;
-  var remoteAudioEl = null;
-  var localAudioEl = null;
   var isMuted = false;
+
+  // UI elements (assigned on DOMContentLoaded)
+  var els = {};
+
+  function $(id) { return document.getElementById(id); }
+
+  function setText(el, text) { if (el) el.textContent = text; }
+  function show(el) { if (el) el.style.display = ""; }
+  function hide(el) { if (el) el.style.display = "none"; }
 
   function log() {
     var args = Array.prototype.slice.call(arguments);
     console.log.apply(console, ["[voice]"].concat(args));
   }
 
+  // --- Socket helpers ---
+  function ensureSocket() {
+    if (!socket) {
+      socket = io();
+      wireSocketEvents();
+    }
+    return socket;
+  }
+
+  function wireSocketEvents() {
+    socket.on("register-result", function (res) {
+      if (res.ok) {
+        username = res.username;
+        setText(els.meName, username);
+        hide(els.registerForm);
+        show(els.appArea);
+      } else {
+        alert(res.error === 'username_taken' ? "Username is taken" : "Invalid username");
+      }
+    });
+
+    socket.on("presence", function (payload) {
+      users = (payload && payload.users) || [];
+      renderUsers();
+    });
+
+    socket.on("incoming-call", function (payload) {
+      call.id = payload.callId;
+      call.role = 'callee';
+      setText(els.incomingText, "Incoming call from " + payload.from);
+      show(els.incomingPanel);
+    });
+
+    socket.on("invite-result", function (res) {
+      if (!res.ok) {
+        alert(res.error === 'user_offline' ? "User is offline" : "You must register first");
+        return;
+      }
+      call.id = res.callId;
+      call.role = 'caller';
+      setText(els.statusText, "Calling " + res.to + "...");
+      show(els.hangBtn);
+    });
+
+    socket.on("call-accepted", function (payload) {
+      call.roomId = payload.roomId;
+      // Both peers join the room and start WebRTC
+      joinRoom(call.roomId).then(function () {
+        if (call.role === 'caller') {
+          makeOffer();
+        }
+      });
+      setText(els.statusText, "In call");
+      hide(els.incomingPanel);
+      show(els.hangBtn);
+    });
+
+    socket.on("call-declined", function (_payload) {
+      setText(els.statusText, "Call declined");
+      resetCall();
+    });
+
+    socket.on("call-ended", function (_payload) {
+      setText(els.statusText, "Call ended");
+      teardownPeer();
+      resetCall();
+    });
+
+    socket.on("signal", onSocketSignal);
+
+    socket.on("peer-joined", function (_info) {
+      // Existing peer waits; caller will create offer after joining
+    });
+  }
+
+  // --- Presence UI ---
+  function renderUsers() {
+    if (!els.usersList) return;
+    els.usersList.innerHTML = "";
+    users.filter(function (u) { return u !== username; }).forEach(function (u) {
+      var li = document.createElement("li");
+      li.textContent = u + " ";
+      var btn = document.createElement("button");
+      btn.textContent = "Call";
+      btn.addEventListener("click", function () { startCall(u); });
+      li.appendChild(btn);
+      els.usersList.appendChild(li);
+    });
+  }
+
+  // --- Call control ---
+  function register() {
+    var name = (els.usernameInput.value || "").trim();
+    if (!name) { alert("Enter a username"); return; }
+    ensureSocket().emit("register", { username: name });
+  }
+
+  function startCall(targetUser) {
+    if (!username) { alert("Register first"); return; }
+    ensureSocket().emit("invite", { to: targetUser });
+  }
+
+  function acceptCall() {
+    ensureSocket().emit("accept", { callId: call.id });
+  }
+
+  function declineCall() {
+    ensureSocket().emit("decline", { callId: call.id });
+    hide(els.incomingPanel);
+    resetCall();
+  }
+
+  function hangUp() {
+    if (call.id) {
+      ensureSocket().emit("end-call", { callId: call.id });
+    }
+    teardownPeer();
+    resetCall();
+  }
+
+  function resetCall() {
+    call.id = null;
+    call.roomId = null;
+    call.role = null;
+    hide(els.hangBtn);
+  }
+
+  // --- WebRTC bits ---
   function sendSignal(data) {
-    if (!socket || !roomId) return;
-    socket.emit("signal", { data: data, roomId: roomId });
+    if (!socket || !call.roomId) return;
+    socket.emit("signal", { data: data, roomId: call.roomId });
   }
 
   function onSocketSignal(msg) {
@@ -60,17 +204,15 @@
 
     pc.ontrack = function (event) {
       var stream = event.streams[0];
-      if (remoteAudioEl) {
-        try { remoteAudioEl.srcObject = stream; }
-        catch (e) { remoteAudioEl.src = window.URL.createObjectURL(stream); }
-        remoteAudioEl.play().catch(function () { /* autoplay might need a gesture */ });
+      if (els.remoteAudio) {
+        try { els.remoteAudio.srcObject = stream; }
+        catch (e) { els.remoteAudio.src = window.URL.createObjectURL(stream); }
+        els.remoteAudio.play().catch(function () { /* autoplay might need a gesture */ });
       }
     };
 
     if (localStream) {
-      localStream.getTracks().forEach(function (track) {
-        pc.addTrack(track, localStream);
-      });
+      localStream.getTracks().forEach(function (track) { pc.addTrack(track, localStream); });
     }
 
     peerConnection = pc;
@@ -89,48 +231,18 @@
   }
 
   function joinRoom(id) {
-    if (!id) return;
-    roomId = id;
-    socket = io();
-
-    socket.on("joined", function (info) {
-      log("joined", info);
-      // If there is already someone in the room, create an offer as the joiner
-      if (info && info.numClients > 1) {
-        makeOffer();
-      }
-    });
-
-    socket.on("peer-joined", function (info) {
-      log("peer-joined", info);
-      // The newcomer should offer; to avoid glare, existing peers wait
-    });
-
-    socket.on("signal", onSocketSignal);
-
-    socket.emit("join", roomId);
-  }
-
-  function leaveRoom() {
-    if (socket && roomId) {
-      socket.emit("leave", roomId);
-    }
-    if (peerConnection) { try { peerConnection.close(); } catch (e) {} peerConnection = null; }
-    if (localStream) { localStream.getTracks().forEach(function (t) { t.stop(); }); localStream = null; }
-    roomId = null;
-  }
-
-  function startVoice(id) {
-    // Request mic on user gesture
+    if (!id) return Promise.resolve();
+    call.roomId = id;
+    if (!socket) ensureSocket();
     return navigator.mediaDevices.getUserMedia({ audio: true, video: false })
       .then(function (stream) {
         localStream = stream;
-        if (localAudioEl) {
-          try { localAudioEl.srcObject = stream; }
-          catch (e) { localAudioEl.src = window.URL.createObjectURL(stream); }
+        if (els.localAudio) {
+          try { els.localAudio.srcObject = stream; }
+          catch (e) { els.localAudio.src = window.URL.createObjectURL(stream); }
         }
         createPeerConnection();
-        return joinRoom(id);
+        socket.emit("join", id);
       })
       .catch(function (err) {
         console.error("getUserMedia failed", err);
@@ -138,38 +250,53 @@
       });
   }
 
+  function teardownPeer() {
+    if (peerConnection) { try { peerConnection.close(); } catch (e) {} peerConnection = null; }
+    if (localStream) { localStream.getTracks().forEach(function (t) { t.stop(); }); localStream = null; }
+  }
+
   function toggleMute() {
     if (!localStream) return;
     isMuted = !isMuted;
     localStream.getAudioTracks().forEach(function (t) { t.enabled = !isMuted; });
-    return isMuted;
+    setText(els.muteBtn, isMuted ? "Unmute" : "Mute");
   }
 
+  // --- UI wiring ---
   function wireUI() {
-    remoteAudioEl = document.getElementById("remoteAudio");
-    localAudioEl = document.getElementById("localAudio");
-    var roomInput = document.getElementById("roomId");
-    var joinBtn = document.getElementById("joinBtn");
-    var leaveBtn = document.getElementById("leaveBtn");
-    var muteBtn = document.getElementById("muteBtn");
+    els.registerForm = $("registerForm");
+    els.usernameInput = $("username");
+    els.registerBtn = $("registerBtn");
+    els.meName = $("meName");
 
-    if (joinBtn) {
-      joinBtn.addEventListener("click", function () {
-        var id = roomInput && roomInput.value ? roomInput.value.trim() : "public";
-        startVoice(id);
-      });
-    }
-    if (leaveBtn) {
-      leaveBtn.addEventListener("click", function () {
-        leaveRoom();
-      });
-    }
-    if (muteBtn) {
-      muteBtn.addEventListener("click", function () {
-        var muted = toggleMute();
-        muteBtn.innerText = muted ? "Unmute" : "Mute";
-      });
-    }
+    els.appArea = $("appArea");
+    els.usersList = $("users");
+    els.statusText = $("status");
+
+    els.incomingPanel = $("incomingPanel");
+    els.incomingText = $("incomingText");
+    els.acceptBtn = $("acceptBtn");
+    els.declineBtn = $("declineBtn");
+
+    els.localAudio = $("localAudio");
+    els.remoteAudio = $("remoteAudio");
+    els.muteBtn = $("muteBtn");
+    els.hangBtn = $("hangBtn");
+
+    // Show registration first
+    show(els.registerForm);
+    hide(els.appArea);
+    hide(els.incomingPanel);
+    hide(els.hangBtn);
+
+    els.registerBtn.addEventListener("click", function () { register(); });
+    els.acceptBtn.addEventListener("click", function () { acceptCall(); });
+    els.declineBtn.addEventListener("click", function () { declineCall(); });
+    els.muteBtn.addEventListener("click", function () { toggleMute(); });
+    els.hangBtn.addEventListener("click", function () { hangUp(); });
+
+    // Auto-connect socket for presence
+    ensureSocket();
   }
 
   document.addEventListener("DOMContentLoaded", wireUI);
